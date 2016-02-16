@@ -9,6 +9,20 @@ HTML_TEMPLATE = fs.readFileSync(HTML_TEMPLATE_FILE, {encoding: 'utf8'})
 htmlEscape = (s) ->
   s.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/'/g, '&#39;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
+exportIndex = (notebookDir, outputDir) ->
+  s = ''
+  files = fs.readdirSync(notebookDir)
+  metaNB = JSON.parse(fs.readFileSync(sysPath.join(notebookDir, 'meta.json')))
+  # add the title html snippet for each note in notebookDir
+  for file in files
+    noteDir = sysPath.join(notebookDir, file)
+    if sysPath.extname(noteDir) is '.qvnote'
+      meta = JSON.parse(fs.readFileSync(sysPath.join(noteDir, 'meta.json')))
+      s += "<p><a href='#{meta.title}.html'>#{meta.title}</a></p>"
+  html = HTML_TEMPLATE.replace('{{title}}', metaNB.title).replace('{{content}}', s)
+  # write the html to index.html
+  fs.writeFileSync sysPath.join(outputDir, 'index.html'), html
+
 exportNoteAsHTML = (noteDir, outputDir) ->
   meta = JSON.parse(fs.readFileSync(sysPath.join(noteDir, 'meta.json')))
   content = JSON.parse(fs.readFileSync(sysPath.join(noteDir, 'content.json')))
@@ -26,14 +40,13 @@ exportNoteAsHTML = (noteDir, outputDir) ->
         s += "<div class='cell latex-cell'>#{c.data}</div>"
   html = HTML_TEMPLATE.replace('{{title}}', title).replace('{{content}}', s)
 
-  htmlDir = sysPath.join outputDir, meta.title.replace('/', ':')
-  fs.mkdirSync htmlDir unless fs.existsSync(htmlDir)
-  fs.writeFileSync sysPath.join(htmlDir, 'index.html'), html
+  # write the html
+  fs.writeFileSync sysPath.join(outputDir, meta.title + '.html'), html
 
   # Copy resources
   resourcesDir = sysPath.join(noteDir, 'resources')
   if fs.existsSync(resourcesDir)
-    fs.copySync resourcesDir, sysPath.join(htmlDir, 'resources')
+    fs.copySync resourcesDir, sysPath.join(outputDir, 'resources')
 
 exportAsHTML = (path, outputDir) ->
   dir = sysPath.resolve(path)
@@ -44,6 +57,8 @@ exportAsHTML = (path, outputDir) ->
       notebook = JSON.parse(fs.readFileSync(sysPath.join(dir, 'meta.json')))
       outputDir = sysPath.join outputDir, notebook.name.replace('/', ':')
       fs.mkdirSync outputDir unless fs.existsSync(outputDir)
+
+      exportIndex(dir, outputDir)
 
       files = fs.readdirSync(dir)
       for file in files
